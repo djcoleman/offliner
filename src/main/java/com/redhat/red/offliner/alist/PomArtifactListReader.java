@@ -15,30 +15,6 @@
  */
 package com.redhat.red.offliner.alist;
 
-import com.redhat.red.offliner.OfflinerException;
-import com.redhat.red.offliner.model.ArtifactList;
-import com.redhat.red.offliner.util.UrlUtils;
-import org.apache.commons.lang.StringUtils;
-import org.apache.http.auth.AuthScope;
-import org.apache.http.auth.Credentials;
-import org.apache.http.auth.UsernamePasswordCredentials;
-import org.apache.http.client.CredentialsProvider;
-import org.apache.maven.artifact.repository.ArtifactRepository;
-import org.apache.maven.artifact.repository.MavenArtifactRepository;
-import org.apache.maven.artifact.repository.layout.DefaultRepositoryLayout;
-import org.apache.maven.model.Dependency;
-import org.apache.maven.model.Model;
-import org.apache.maven.model.Plugin;
-import org.apache.maven.model.Repository;
-import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
-import org.apache.maven.repository.DefaultMirrorSelector;
-import org.apache.maven.repository.MirrorSelector;
-import org.apache.maven.settings.Mirror;
-import org.apache.maven.settings.Server;
-import org.apache.maven.settings.Settings;
-import org.apache.maven.settings.io.xpp3.SettingsXpp3Reader;
-import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileReader;
@@ -57,6 +33,37 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.apache.commons.lang.StringUtils;
+import org.apache.http.auth.AuthScope;
+import org.apache.http.auth.Credentials;
+import org.apache.http.auth.UsernamePasswordCredentials;
+import org.apache.http.client.CredentialsProvider;
+import org.apache.maven.artifact.repository.ArtifactRepository;
+import org.apache.maven.artifact.repository.MavenArtifactRepository;
+import org.apache.maven.artifact.repository.layout.DefaultRepositoryLayout;
+import org.apache.maven.model.Dependency;
+import org.apache.maven.model.Model;
+import org.apache.maven.model.Plugin;
+import org.apache.maven.model.Repository;
+import org.apache.maven.model.building.DefaultModelBuilderFactory;
+import org.apache.maven.model.building.DefaultModelBuildingRequest;
+import org.apache.maven.model.building.ModelBuilder;
+import org.apache.maven.model.building.ModelBuildingException;
+import org.apache.maven.model.building.ModelBuildingRequest;
+import org.apache.maven.model.building.ModelBuildingResult;
+import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
+import org.apache.maven.repository.DefaultMirrorSelector;
+import org.apache.maven.repository.MirrorSelector;
+import org.apache.maven.settings.Mirror;
+import org.apache.maven.settings.Server;
+import org.apache.maven.settings.Settings;
+import org.apache.maven.settings.io.xpp3.SettingsXpp3Reader;
+import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
+
+import com.redhat.red.offliner.OfflinerException;
+import com.redhat.red.offliner.model.ArtifactList;
+import com.redhat.red.offliner.util.UrlUtils;
 
 /**
  * Artifact list paths reader that consumes pom files. It reads all dependencies and constructs paths from them.
@@ -148,6 +155,21 @@ public class PomArtifactListReader
                                          ex.getMessage() );
         }
 
+        // Get the effective model from this POM, with properties expanded.
+        try
+        {
+        	ModelBuilder mb = new DefaultModelBuilderFactory().newInstance();
+        	ModelBuildingRequest mbReq = new DefaultModelBuildingRequest();
+        	mbReq.setRawModel( model );
+        	ModelBuildingResult mbResult = mb.build( mbReq );
+        	model = mbResult.getEffectiveModel();
+        }
+        catch (ModelBuildingException ex)
+        {
+        	throw new OfflinerException( "Failed to build effective pom: %s. Invalid POM: %s", ex, file,
+        								 ex.getMessage() );
+        }
+		
         Set<String> paths = new LinkedHashSet<>();
         for ( Dependency dep : model.getDependencies() )
         {
